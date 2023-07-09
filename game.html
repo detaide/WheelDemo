@@ -1,0 +1,384 @@
+<!--
+ * @Author: hyman
+ * @Date: 2023-07-01 14:09:36
+ * @LastEditors: Dalas
+ * @LastEditTime: 2023-07-02 16:52:29
+ * @Description: 请填写简介
+-->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Game</title>
+</head>
+<body>
+    <div class="countInput">
+        <input type="number" class="count">
+        <button class="btn">重新生成</button>
+    </div>
+    <div class="result">
+        <div class="round">回合 ：-</div>
+        <div class="whiteLess">白剩 ：-</div>
+        <div class="blackLess">黑剩 ：-</div>
+    </div>
+    <table id="chessboard"></table>
+
+    
+</body>
+
+<script>
+
+    let preCell = null
+    let isDouble = false
+    let isWhiteRound = false
+    const globalChess = {
+        white : 0,
+        black : 0
+    }
+    const round = document.querySelector('.round')
+    const whiteLess = document.querySelector('.whiteLess')
+    const blackLess = document.querySelector('.blackLess')
+    const countEle = document.querySelector('.count')
+    const btnEle = document.querySelector('.btn')
+
+
+    countEle.min = 5
+    countEle.max = 10
+
+    btnEle.addEventListener('click',()=>{
+        chessArray =  chessInit(countEle.value)
+        chessViewInit()
+    })
+
+
+    const chessInit = (n) => {
+        let initArray = []
+        globalChess.black = globalChess.white = 0
+        for(var i = 0; i < n; i++){
+            let row = [];
+            for(var j = 0; j < n; j++){
+                if(j == 0){
+                    row.push(-1)
+                    globalChess.black++
+                }else if(j == n-1){
+                    row.push(1)
+                    globalChess.white++
+                }else{
+                    row.push(0)
+                }
+                
+            }
+            initArray.push(row)
+        }
+
+        return initArray;
+    }
+
+    const clickTo = (cell) => {
+        const {row, col} = rowCol(cell)
+        
+        if(isDouble){
+            direction(preCell, cell)
+            preCell = null
+        }else{
+            if(!chessArray[row][col]){
+                alert('当前点击为空')
+                return;
+            }
+            if(!isWhiteRound && (chessArray[row][col] === 1)){
+                alert('黑的回合')
+                return;
+            }
+            if(isWhiteRound && chessArray[row][col] === 1){
+                isWhiteRound = !isWhiteRound
+            }
+            if(isWhiteRound && (chessArray[row][col] === -1)){
+                alert('白的回合')
+                return;
+            }
+            if(!isWhiteRound && chessArray[row][col] === -1){
+                isWhiteRound = !isWhiteRound
+            }
+            preCell = cell
+            isDouble = !isDouble
+            cell.classList.add('active')
+        }
+    }
+ 
+
+    const rowCol = (cell) => {
+        return {
+            row : cell.parentNode.rowIndex,
+            col : cell.cellIndex
+        }
+    }
+
+    //移动,先行后列
+    const direction = (pre, curr) => {
+        const { row : preRow , col : preCol} = rowCol(pre)
+        const { row : currRow, col : currCol } = rowCol(curr)
+
+        isDouble = !isDouble
+        pre.classList.remove('active')
+        //点自己
+        if(pre === curr){
+            isWhiteRound = !isWhiteRound
+            return;
+        }
+
+        if((currRow - preRow) && (currCol - preCol)){
+            alert("不支持斜角移动")
+            return;
+        }
+
+        // console.log(preRow, preCol)
+        if(chessArray[currRow][currCol] !== 0) {
+            alert('该位置有棋，不能移动')
+            return;
+        }
+        //可以移动
+
+        moveView(pre, curr)
+        
+    }
+
+    const moveView = (pre, curr) => {
+        const { row : preRow , col : preCol} = rowCol(pre)
+        const { row : currRow, col : currCol } = rowCol(curr)
+        
+        //方向
+        const direX = currRow - preRow !== 0 ? ((currRow - preRow) > 0 ? 1 : -1) : 0
+        const direY = currCol - preCol !== 0 ? ((currCol - preCol) > 0 ? 1 : -1) : 0
+        // console.log(direX, direY)
+
+        //更新
+        chessArray[preRow + direX][preCol + direY] = chessArray[preRow][preCol]
+        chessArray[preRow][preCol] = 0
+        const currCell =  getCellByIndex(preRow + direX, preCol + direY)
+        //移动class
+        preCell.classList.forEach( e => {
+            currCell.classList.add(e)
+        });
+        preCell.className = ''
+
+        attack(preRow + direX, preCol + direY)
+
+    }
+
+    const attack = (row, col) => {
+        const dire = [
+            [0, 1],
+            [0, -1],
+            [1, 0],
+            [-1, 0]
+        ]
+        //判断四周
+        dire.forEach((index)=>{
+            const nextRow = row + index[0]
+            const nextCol = col + index[1]
+            if(nextRow < 0 || nextCol < 0){
+                return;
+            }
+            // console.log(row, col)
+
+            //如果下一个不等于自己
+            // const sign = (chessArray[nextRow][nextCol] & chessArray[row][col])
+            // console.log(sign, chessArray[row][col])
+            if( chessArray[nextRow][nextCol] && chessArray[row][col] != chessArray[nextRow][nextCol]){
+                //attack
+                attackDetail(row, col, !!index[1])
+                
+            }
+        })
+        
+    }
+
+    const attackDetail = (row, col, isX) => {
+        //计数
+        
+        if(isX){
+            chessCheck(row, col, chessArray[row])
+        }
+        else{
+            const newArr = chessArray.map((item) => {
+                return item[col]
+            })
+            chessCheck(row, col, newArr, true)
+        }
+    
+    }
+
+
+    const chessCheck = (row, col, newArr, isX) => {
+        let black = 0
+        let white = 0
+
+        newArr.forEach((item) => {
+            if(item > 0) white++
+            if(item < 0) black++
+        })
+        if((white > 1 && black > 1) || (white <= 1 && black <= 1)){ return }
+        if(!isX){
+            if(white < black){
+                newArr.forEach((item, index) => {
+                    if(item === 1){
+                        clearChess(row, index, true)
+                    }
+                })
+            }else{
+                newArr.forEach((item, index) => {
+                    if(item === -1){
+                        clearChess(row, index)
+                    }
+                })
+            }
+        }
+        else{
+            if(white > black){
+                newArr.forEach((item, index) => {
+                    if(item === -1){
+                        clearChess(index, col)
+                    }
+                })
+            }else{
+                newArr.forEach((item, index) => {
+                    if(item === 1){
+                        clearChess(index, col, true)
+                    }
+                })
+            }
+        }
+    }
+
+    const clearChess = (row, col, isWhite) => {
+        console.log(row, col)
+        chessArray[row][col] = 0
+        const cell = getCellByIndex(row, col)
+        cell.className = ''
+        if(isWhite){
+            globalChess.white--
+            whiteLess.textContent = `白剩 : ${globalChess.white}`
+        }else{
+            globalChess.black--
+            blackLess.textContent = `黑剩 : ${globalChess.black}`
+        }
+        console.log(globalChess)
+        globalChess.white < 2 ? alert('黑胜') : (globalChess.black < 2 ? alert('白胜') : null)
+    }
+
+    function getCellByIndex(row, col) {
+        var chessboard = document.getElementById("chessboard");
+        var rows = chessboard.getElementsByTagName("tr");
+        if (row >= 0 && row < rows.length) {
+            var cells = rows[row].getElementsByTagName("td");
+            if (col >= 0 && col < cells.length) {
+                return cells[col];
+            }
+        }
+        return null;
+    }
+
+    const chessViewInit = () => {
+        var n = chessArray.length; // 棋盘大小
+        var chessboard = document.getElementById("chessboard");
+        chessboard.innerHTML = ``
+        for (var i = 0; i < n; i++) {
+        var row = document.createElement("tr");
+
+        for (var j = 0; j < n; j++) {
+            var cell = document.createElement("td");
+            // cell.InnerValue = chessArray[i][j]; // 将数组中的值显示在单元格内
+            if(chessArray[i][j] === -1){
+                cell.classList.add('black')
+            }else if(chessArray[i][j]){
+                cell.classList.add('white')
+            }
+            cell.addEventListener('click', function() {
+                clickTo(this)
+            })
+            row.appendChild(cell);
+        }
+
+        chessboard.appendChild(row);
+        }
+
+        round.textContent = `${isWhiteRound ? 'round : 白' : 'round : 黑'}`
+        whiteLess.textContent = `白剩 : ${globalChess.white}`
+        blackLess.textContent = `黑剩 : ${globalChess.black}`
+        countEle.value = n
+         
+    }
+
+    var chessArray = chessInit(6)
+    chessViewInit()
+
+    
+</script>
+
+<style>
+    body{
+        background-color: steelblue;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        height: 100vh;
+        overflow: hidden;
+        flex-direction: column;
+        gap: 30px;
+    }
+
+    .result{
+        font-size: 22px;
+        color: white;
+    }
+    
+    table {
+        border-collapse: collapse;
+        border: 1px solid black; /* 设置边框为黑色 */
+        color: white;
+    }
+    td {
+        width: 50px; /* 设置每个单元格的宽度 */
+        height: 50px; /* 设置每个单元格的高度 */
+        text-align: center;
+        border: 1px solid black; /* 设置单元格的边框为黑色 */
+    }
+
+    .white{
+        background-color: white;
+        border-radius: 50%;
+        scale: 0.8;
+    }
+
+    .black{
+        background-color: black;
+        border-radius: 50%;
+        scale: 0.8;
+    }
+
+    .active{
+        border: 1px solid white;
+    }
+
+    .countInput{
+        width: 200px;
+        height: 30px;
+        display: flex;
+        flex-direction: row;
+        gap: 10px;
+        
+    }
+
+    .count{
+        height: 90%;
+        width: 50%;
+    }
+
+    .count:focus{
+        outline: none;
+        
+    }
+</style>
+</html>
